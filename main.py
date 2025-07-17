@@ -13,21 +13,20 @@ from rapidfuzz import process
 # Important GBU-specific terms you care about
 important_keywords = [
     "Gautam Buddha University",
-    "GBU",
+    "GBU(Gautam Buddha University)",
     "B.Tech CSE",
     "B.Tech AI",
     "M.Tech",
     "MBA",
     "PhD",
     "hostel",
-    "admission",
     "placement",
     "campus",
     "fees",
     "scholarship",
     "exam",
-    "UG",
-    "PG",
+    "UG(Undergraduate)",
+    "PG(Postgraduate)",
     "faculty",
     "NAAC",
     "NIRF",
@@ -45,13 +44,13 @@ whisper_model = whisper.load_model("small")  # or "base", "medium", "large"
 def transcribe_audio(file):
     try:
         filename = secure_filename(file.filename)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as temp_audio:
+        ext = os.path.splitext(file.filename)[1] or ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_audio:
             file.save(temp_audio.name)
             result = whisper_model.transcribe(temp_audio.name)
             return result["text"]
     except Exception as e:
         return f"Error during transcription: {str(e)}"
-
 
 # Dummy file to suppress stderr output, jaise main apne dosto ki bakwas sunta hoon
 class DummyFile:

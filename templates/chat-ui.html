@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NaradMuni Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .chat-container {
+      background: #fff;
+      max-width: 400px;
+      margin: 0 auto;
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    .chat-title {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #preset-buttons {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .preset-btn {
+      background: #fff;
+      color: #007bff;
+      border: 1px solid #007bff;
+      border-radius: 20px;
+      padding: 5px 12px;
+      margin: 5px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .preset-btn:hover {
+      background: #007bff;
+      color: white;
+    }
+
+    .chat-log {
+      height: 350px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-log::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .chat-log::-webkit-scrollbar-thumb {
+      background-color: #ccc;
+      border-radius: 10px;
+    }
+
+    .user-msg, .bot-msg {
+      padding: 10px;
+      border-radius: 15px;
+      margin: 5px 0;
+      max-width: 80%;
+      word-wrap: break-word;
+    }
+
+    .user-msg {
+      background-color: #007bff;
+      color: white;
+      align-self: flex-end;
+    }
+
+    .bot-msg {
+      background-color: #eee;
+      color: #000;
+      align-self: flex-start;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-area input {
+      flex: 1;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+    }
+
+    .input-area button {
+      padding: 10px 20px;
+      border: none;
+      background: #007bff;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .input-area button:hover {
+      background: #0056b3;
+    }
+
+    .voice-btn {
+      background: #28a745 !important;
+    }
+  </style>
+</head>
+<body>
+
+<div class="chat-container">
+  <div class="chat-title">NaradMuni</div>
+
+  <div id="preset-buttons">
+    <button class="preset-btn" onclick="sendPreset('What is the admission process?')">Admission</button>
+    <button class="preset-btn" onclick="sendPreset('Tell me about hostel facilities.')">Hostel</button>
+    <button class="preset-btn" onclick="sendPreset('What courses are available at GBU?')">Courses</button>
+    <button class="preset-btn" onclick="sendPreset('Is there any scholarship available?')">Scholarship</button>
+    <button class="preset-btn" onclick="sendPreset('Who is the vice chancellor of GBU?')">VC Info</button>
+  </div>
+
+  <div id="chat-log" class="chat-log"></div>
+
+  <div class="input-area">
+    <input type="text" id="user-input" placeholder="Type your message...">
+    <button onclick="sendMessage()">Send</button>
+    <button class="voice-btn" onclick="startVoice()">🎤</button>
+  </div>
+</div>
+
+<script>
+  function appendMessage(sender, text) {
+    const log = document.getElementById('chat-log');
+    const msg = document.createElement('div');
+    msg.className = sender === 'user' ? 'user-msg' : 'bot-msg';
+    msg.textContent = text;
+    log.appendChild(msg);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    appendMessage('user', message);
+    input.value = '';
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: message })
+      });
+
+      const data = await res.json();
+      appendMessage('bot', data.answer || 'Sorry, I could not understand.');
+    } catch (err) {
+      appendMessage('bot', 'Error connecting to server.');
+    }
+  }
+
+  function sendPreset(text) {
+    document.getElementById('user-input').value = text;
+    sendMessage();
+  }
+
+  function startVoice() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      document.getElementById('user-input').value = text;
+      sendMessage();
+    };
+
+    recognition.onerror = () => {
+      appendMessage('bot', 'Voice recognition failed.');
+    };
+
+    recognition.start();
+  }
+
+  document.getElementById('user-input')
+    .addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') sendMessage();
+    });
+</script>
+
+</body>
+</html>

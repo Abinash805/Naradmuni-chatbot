@@ -17,3 +17,15 @@ loguru
 nltk
 tiktoken
 playwright
+textblob==0.18.0
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.23.0
+rapidfuzz==3.6.2
+'''note:
+Whisper (install from GitHub)
+pip install git+https://github.com/openai/whisper.git
+
+install ffmpeg
+you need to install ffmpeg from the official website https://www.gyan.dev/ffmpeg/builds/#release-builds
+and extract ffmpeg-release-essentials.zip to a folder, then add the path of the bin folder to your system's PATH variable.
+'''

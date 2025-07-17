@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from main import answer_query, main as setup_embeddings
+from main import answer_query, transcribe_audio, main as setup_embeddings
 import threading
 import os
 import psutil
@@ -8,6 +8,8 @@ import time
 from collections import deque
 import json
 import pynvml  # For NVIDIA GPU monitoring
+from flask import render_template
+from collections import Counter
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins for development
@@ -36,6 +38,26 @@ peak_stats = {
     'gpu_temp_actual': 0
 }
 
+FAQ_LOG_FILE = "faq_log.json"
+def log_question(question):
+    if not question.strip():
+        return
+
+    try:
+        if os.path.exists(FAQ_LOG_FILE):
+            with open(FAQ_LOG_FILE, 'r', encoding='utf-8') as f:
+                logs = json.load(f)
+        else:
+            logs = {}
+
+        logs[question] = logs.get(question, 0) + 1
+
+        with open(FAQ_LOG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, indent=2)
+
+    except Exception as e:
+        print(f"Error logging question: {e}")
+        
 def get_gpu_stats():
     """Get GPU statistics using NVML."""
     gpu_stats = []
@@ -147,6 +169,10 @@ def reset_peak_stats():
         'gpu_temp_actual': 0
     }
 
+@app.route('/chat-ui')
+def chat_ui():
+    return render_template('chat-ui.html')
+
 @app.route('/start-monitoring', methods=['POST'])
 def start_monitoring():
     global baseline_stats, query_in_progress
@@ -179,6 +205,9 @@ def chat():
         return jsonify({'error': 'No question provided'}), 400
     
     try:
+        question = data['question']
+        log_question(question)
+        
         answer = answer_query(data['question'])
         return jsonify({
             'answer': answer,
@@ -195,6 +224,22 @@ def transcribe():
     audio_file = request.files['audio']
     text = transcribe_audio(audio_file)
     return jsonify({'transcription': text})
+
+@app.route('/top-faqs', methods=['GET'])
+def top_faqs():
+    try:
+        if not os.path.exists(FAQ_LOG_FILE):
+            return jsonify([])
+
+        with open(FAQ_LOG_FILE, 'r', encoding='utf-8') as f:
+            logs = json.load(f)
+
+        sorted_faqs = sorted(logs.items(), key=lambda x: x[1], reverse=True)
+        top_n = [q for q, _ in sorted_faqs[:5]]  # top 5 questions
+        return jsonify(top_n)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/', methods=['GET'])
 def home():
@@ -284,6 +329,20 @@ def home():
                     width: 100%;
                     height: 350px;
                 }
+                .preset-prompt-btn {
+                    background-color: #f0f8ff;
+                    border: 1px solid #007bff;
+                    color: #007bff;
+                    border-radius: 20px;
+                    padding: 8px 14px;
+                    margin: 5px;
+                    cursor: pointer;
+                    font-size: 14px;
+                }
+                .preset-prompt-btn:hover {
+                    background-color: #007bff;
+                    color: white;
+                }
             </style>
         </head>
         <body>
@@ -294,8 +353,12 @@ def home():
                         <input type="text" id="question" placeholder="Ask a question about GBU..." onkeypress="handleKeyPress(event)">
                         <button onclick="askQuestion()">Ask</button>
                         <!-- 🎤 Live voice recording -->
-                            <button onclick="startRecording()" style="margin-top: 10px;">🎤 Speak</button>
-                            <span id="recording-status"></span>
+                        <button onclick="startRecording()" style="margin-top: 10px;">🎤 Speak</button>
+                        <span id="recording-status"></span>
+
+                        <!-- Preset chat buttons container -->
+                        <div id="preset-buttons" style="margin-top: 15px;"></div>
+
                         <div id="answer"></div>
                     </div>
                 </div>
@@ -313,6 +376,28 @@ def home():
                 </div>
             </div>
             <script>
+                 const prompts = [
+                    "What courses are available at GBU?",
+                    "Tell me about hostel facilities.",
+                    "What is the admission process?",
+                    "Is there any scholarship available?",
+                    "How are the placements at GBU?",
+                    "Who is the vice chancellor of GBU?"
+                ];
+                window.onload = function () {
+                    const presetContainer = document.getElementById("preset-buttons");
+                    if (!presetContainer) return;
+                    prompts.forEach(prompt => {
+                        const btn = document.createElement("button");
+                        btn.className = "preset-prompt-btn";
+                        btn.textContent = prompt;
+                        btn.onclick = () => {
+                            document.getElementById("question").value = prompt;
+                            askQuestion();
+                        };
+                        presetContainer.appendChild(btn);
+                    });
+                };
                 // Common plot configuration
                 const PLOT_COLORS = {
                     CPU: '#2196F3',
@@ -599,6 +684,68 @@ def home():
                             answerDiv.className = 'error';
                             answerDiv.textContent = 'Voice upload failed.';
                         }
+                        //⭕⭕ Mic is not responding as it should, need to stop recording, will fix after UI completed !!⭕⭕
+                        let mediaRecorder;
+                        let audioChunks = [];
+                        let isRecording = false;
+
+                        async function startRecording() {
+                            const status = document.getElementById('recording-status');
+                            const answerDiv = document.getElementById('answer');
+
+                            if (isRecording && mediaRecorder) {
+                                mediaRecorder.stop();  // Stop recording on second click
+                                isRecording = false;
+                                status.textContent = '⏹️ Stopped recording. Processing...';
+                                return;
+                            }
+
+                            // First click — start recording
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            mediaRecorder = new MediaRecorder(stream);
+
+                            audioChunks = [];
+
+                            mediaRecorder.ondataavailable = event => {
+                                audioChunks.push(event.data);
+                            };
+
+                            mediaRecorder.onstop = async () => {
+                                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                                const formData = new FormData();
+                                formData.append('audio', blob, 'recording.webm');
+
+                                answerDiv.className = 'loading';
+                                answerDiv.textContent = 'Transcribing voice...';
+
+                                try {
+                                    const response = await fetch('/transcribe', {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+
+                                    const data = await response.json();
+                                    if (data.transcription) {
+                                        document.getElementById('question').value = data.transcription;
+                                        answerDiv.textContent = `Transcribed: "${data.transcription}"`;
+                                        askQuestion();  // Auto-ask after transcription
+                                    } else {
+                                        answerDiv.className = 'error';
+                                        answerDiv.textContent = 'Failed to transcribe voice.';
+                                    }
+                                } catch (error) {
+                                    answerDiv.className = 'error';
+                                    answerDiv.textContent = 'Voice upload failed.';
+                                }
+
+                                status.textContent = '';
+                            };
+
+                            mediaRecorder.start();
+                            isRecording = true;
+                            status.textContent = '🎙️ Recording... Click again to stop.';
+                        }
+
 
                         status.textContent = '';
                     };
