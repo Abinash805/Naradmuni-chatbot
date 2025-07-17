@@ -9,6 +9,7 @@ from collections import deque
 import json
 import pynvml  # For NVIDIA GPU monitoring
 from flask import render_template
+from collections import Counter
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins for development
@@ -37,6 +38,26 @@ peak_stats = {
     'gpu_temp_actual': 0
 }
 
+FAQ_LOG_FILE = "faq_log.json"
+def log_question(question):
+    if not question.strip():
+        return
+
+    try:
+        if os.path.exists(FAQ_LOG_FILE):
+            with open(FAQ_LOG_FILE, 'r', encoding='utf-8') as f:
+                logs = json.load(f)
+        else:
+            logs = {}
+
+        logs[question] = logs.get(question, 0) + 1
+
+        with open(FAQ_LOG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, indent=2)
+
+    except Exception as e:
+        print(f"Error logging question: {e}")
+        
 def get_gpu_stats():
     """Get GPU statistics using NVML."""
     gpu_stats = []
@@ -184,6 +205,9 @@ def chat():
         return jsonify({'error': 'No question provided'}), 400
     
     try:
+        question = data['question']
+        log_question(question)
+        
         answer = answer_query(data['question'])
         return jsonify({
             'answer': answer,
@@ -200,6 +224,22 @@ def transcribe():
     audio_file = request.files['audio']
     text = transcribe_audio(audio_file)
     return jsonify({'transcription': text})
+
+@app.route('/top-faqs', methods=['GET'])
+def top_faqs():
+    try:
+        if not os.path.exists(FAQ_LOG_FILE):
+            return jsonify([])
+
+        with open(FAQ_LOG_FILE, 'r', encoding='utf-8') as f:
+            logs = json.load(f)
+
+        sorted_faqs = sorted(logs.items(), key=lambda x: x[1], reverse=True)
+        top_n = [q for q, _ in sorted_faqs[:5]]  # top 5 questions
+        return jsonify(top_n)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/', methods=['GET'])
 def home():
