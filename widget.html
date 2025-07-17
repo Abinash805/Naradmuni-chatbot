@@ -1,0 +1,61 @@
+<!-- This HTML file serves as a widget for the NaradMuni chatbot, allowing users to interact with the chatbot via a floating button and an iframe. -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>NaradMuni Chatbot</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+
+    .chat-button {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      object-fit: cover;
+      cursor: pointer;
+      z-index: 9999;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .chat-iframe {
+      display: none;
+      position: fixed;
+      bottom: 90px;
+      right: 20px;
+      width: 400px;
+      height: 600px;
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      z-index: 9998;
+    }
+
+    @media (max-width: 500px) {
+      .chat-iframe {
+        width: 90vw;
+        height: 80vh;
+        right: 5vw;
+        bottom: 90px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Floating chat icon -->
+<img src="/static/naradmuni.jpg" class="chat-button" onclick="toggleChat()" alt="Chat Icon">
+
+<!-- Chat iframe -->
+<iframe id="chat-frame" class="chat-iframe" src="http://localhost:5000/chat-ui"></iframe>
+
+<script>
+  function toggleChat() {
+    const iframe = document.getElementById('chat-frame');
+    iframe.style.display = iframe.style.display === 'block' ? 'none' : 'block';
+  }
+</script>
+
+</body>
+</html>
