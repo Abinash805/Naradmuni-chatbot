@@ -7,25 +7,14 @@ tqdm==4.66.2
 numpy==1.24.3
 psutil==7.0.0
 pynvml==11.5.0
-python-docx
-pandas
-beautifulsoup4
 requests
-streamlit
-python-dotenv
-loguru
-nltk
-tiktoken
-playwright
 textblob==0.18.0
 fuzzywuzzy==0.18.0
 python-Levenshtein==0.23.0
 rapidfuzz==3.6.2
-'''note:
-Whisper (install from GitHub)
-pip install git+https://github.com/openai/whisper.git
+# Whisper (install from GitHub)
+# pip install git+https://github.com/openai/whisper.git
 
-install ffmpeg
-you need to install ffmpeg from the official website https://www.gyan.dev/ffmpeg/builds/#release-builds
-and extract ffmpeg-release-essentials.zip to a folder, then add the path of the bin folder to your system's PATH variable.
-'''
+# install ffmpeg
+# you need to install ffmpeg from the official website https://www.gyan.dev/ffmpeg/builds/#release-builds
+# and extract ffmpeg-release-essentials.zip to a folder, then add the path of the bin folder to your system's PATH variable.
